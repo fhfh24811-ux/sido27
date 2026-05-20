@@ -1,0 +1,6 @@
+{
+  "name": "سيدو SIDO — أنمي ومسلسلات",
+  "description": "منصة سيدو لمشاهدة الأنمي والمسلسلات بجودة عالية ومصممة خصيصاً لتناسب شاشات الهواتف مع دعم حركات نقاط مميزة ونظام هدايا متكامل ومساعد ذكي.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
