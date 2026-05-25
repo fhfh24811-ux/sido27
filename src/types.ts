@@ -3,67 +3,55 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export interface User {
+  id: string;
+  username: string;
+  role: 'admin' | 'user';
+  points: number;
+  avatar: string;
+  created_at: string;
+}
+
 export interface Anime {
-  id: number;
+  id: string;
   name: string;
   description: string;
   image: string;
+  rating: number;
   type: 'anime-subbed' | 'anime-dubbed' | 'movies' | 'turkish';
-  language: 'مترجم' | 'مدبلج' | 'مترجم ومدبلج';
-  year: string;
-  rating: number; // 1 to 10
-  episodes_count: number;
-  genre: string;
-  badge?: string; // e.g. '🔥 رائج', '⭐ مميز'
-  duration?: string;
-}
-
-export interface VideoSource {
-  label: string; // e.g. "FHD 1080p", "HD 720p", "SD 480p"
-  url: string;
+  language: string;
+  badge: string;
+  status?: 'completed' | 'ongoing';
 }
 
 export interface Episode {
-  id: number;
-  anime_id: number;
-  episode_number: number;
+  id: string;
+  anime_id: string;
   title: string;
-  sources: VideoSource[];
-  download_url?: string;
-}
-
-export interface PointTransaction {
-  id: string; // uuid
-  amount: number; // e.g. +10, +50, -1000
-  type: 'watch' | 'daily_login' | 'signup_bonus' | 'referral' | 'redeem';
-  note: string;
-  created_at: string;
+  video_url: string;
+  episode_number: number;
 }
 
 export interface WatchlistItem {
-  anime_id: number;
+  username: string;
+  anime_id: string;
   type: 'fav' | 'later' | 'watched';
-  created_at: string;
 }
 
-export interface AnimeRating {
-  anime_id: number;
-  rating: number; // 1 to 5
-}
-
-export interface Idea {
-  id: number;
-  text: string;
+export interface Suggestion {
+  id: string;
+  username: string;
   category: string;
-  username: string;
+  text: string;
   votes: number;
-  voted_by: string[]; // array of usernames/ips to prevent double voting
+  voted_by: string[];
   created_at: string;
 }
 
-export interface Profile {
+export interface Comment {
+  id: string;
+  anime_id: string;
   username: string;
-  points: number;
-  lastDailyLogin: string | null; // ISO Date
-  referralCode: string;
+  text: string;
+  created_at: string;
 }

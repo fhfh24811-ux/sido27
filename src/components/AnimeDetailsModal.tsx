@@ -3,15 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from 'react';
-import { Anime, Episode } from '../types';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSido } from '../context/SidoContext';
-import { generateEpisodes } from '../data/animeData';
-import { 
-  X, Star, Heart, Clock, Check, ListChecks, Play, 
-  ChevronRight, Calendar, Info, Award
-} from 'lucide-react';
-import { motion } from 'motion/react';
+import { Anime, Episode, Comment } from '../types';
+import { X, Play, Heart, Bookmark, Calendar, MessageSquare, Send, Check } from 'lucide-react';
 
 interface AnimeDetailsModalProps {
   anime: Anime;
@@ -20,226 +15,266 @@ interface AnimeDetailsModalProps {
 
 export const AnimeDetailsModal: React.FC<AnimeDetailsModalProps> = ({ anime, onClose }) => {
   const { 
-    watchlist, addToWatchlist, removeFromWatchlist, 
-    ratings, rateAnime, playEpisode 
+    currentUser, addToWatchlist, removeFromWatchlist, watchlist,
+    playEpisode, fetchEpisodes, fetchComments, postComment
   } = useSido();
 
-  // Highlight state index on hover for custom ratings
-  const [hoverRating, setHoverRating] = useState<number | null>(null);
+  // Dialog lists states
+  const [episodes, setEpisodes] = useState<Episode[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [newCommentText, setNewCommentText] = useState('');
+  
+  // States loads
+  const [loadingEpisodes, setLoadingEpisodes] = useState(true);
+  const [loadingComments, setLoadingComments] = useState(true);
 
-  // Compile dynamic episodes list
-  const episodesList = useMemo(() => {
-    return generateEpisodes(anime.id, anime.episodes_count);
-  }, [anime.id, anime.episodes_count]);
+  // Check watchlist statuses
+  const isFav = watchlist.some(w => w.anime_id === anime.id && w.type === 'fav');
+  const isLater = watchlist.some(w => w.anime_id === anime.id && w.type === 'later');
+  const isWatched = watchlist.some(w => w.anime_id === anime.id && w.type === 'watched');
 
-  // Find personal state indicators
-  const currentWatchlistItem = watchlist.find(item => item.anime_id === anime.id);
-  const currentPersonalRating = ratings.find(item => item.anime_id === anime.id)?.rating || 0;
+  // Load episodes and comments dynamically
+  const loadData = useCallback(async () => {
+    try {
+      setLoadingEpisodes(true);
+      const epList = await fetchEpisodes(anime.id);
+      setEpisodes(epList || []);
+      setLoadingEpisodes(false);
+
+      setLoadingComments(true);
+      const cList = await fetchComments(anime.id);
+      setComments(cList || []);
+      setLoadingComments(false);
+    } catch (err) {
+      console.error('Error loading anime details data modal', err);
+    }
+  }, [anime.id, fetchEpisodes, fetchComments]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Handle posting a comment
+  const handleCommentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) {
+      alert('الرجاء تسجيل الدخول أولاً لتستطيع التعليق والتفاعل مع الأصدقاء! 🚪✨');
+      return;
+    }
+    if (!newCommentText.trim()) return;
+
+    const success = await postComment(anime.id, newCommentText.trim());
+    if (success) {
+      setNewCommentText('');
+      // Reload comments
+      const cList = await fetchComments(anime.id);
+      setComments(cList || []);
+    }
+  };
+
+  const toggleWatchlistType = async (type: 'fav' | 'later' | 'watched') => {
+    if (!currentUser) {
+      alert('الرجاء تسجيل الدخول أولاً لإضافة الأعمال لقائمتك الخاصة! 🚪📚');
+      return;
+    }
+
+    const isActive = watchlist.some(w => w.anime_id === anime.id && w.type === type);
+    if (isActive) {
+      await removeFromWatchlist(anime.id);
+    } else {
+      await addToWatchlist(anime.id, type);
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
-      {/* Background click handler */}
-      <div className="fixed inset-0 -z-10" onClick={onClose} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Dark backdrop blur */}
+      <div 
+        className="absolute inset-0 bg-[#07050f]/90 backdrop-blur-md"
+        onClick={onClose}
+      />
 
-      {/* Sheet Content container */}
-      <motion.div 
-        initial={{ y: "100%" }}
-        animate={{ y: 0 }}
-        exit={{ y: "100%" }}
-        transition={{ type: "spring", damping: 25, stiffness: 220 }}
-        className="w-full max-w-2xl bg-[#120f22] rounded-t-3xl sm:rounded-3xl border-t sm:border border-purple-950/40 overflow-hidden shadow-2xl flex flex-col justify-end max-h-[92vh] sm:max-h-[85vh]"
-      >
+      {/* Main card stage */}
+      <div className="relative w-full max-w-2xl bg-[#120f22] border border-purple-900/30 rounded-3xl overflow-hidden shadow-2xl z-10 flex flex-col max-h-[90vh]">
         
-        {/* Header thumbnail and overview info */}
-        <div className="relative">
-          {/* Header images banner background */}
-          <div className="absolute inset-0 h-44 overflow-hidden">
-            <img 
-              src={anime.image} 
-              alt={anime.name} 
-              className="w-full h-full object-cover blur-md opacity-25 scale-110"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#120f22] to-transparent" />
-          </div>
+        {/* 1. Header with details background */}
+        <div className="relative h-[180px] shrink-0">
+          <img 
+            src={anime.image} 
+            alt={anime.name} 
+            className="w-full h-full object-cover brightness-[0.4]"
+            referrerPolicy="no-referrer"
+          />
+          {/* Dense bottom fade */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#120f22] via-transparent to-black/30" />
 
-          {/* Quick exit button */}
-          <button 
-            id="close-details-btn"
+          {/* Absolute close button */}
+          <button
+            id="modal-close-btn"
             onClick={onClose}
-            className="absolute top-4 left-4 z-20 p-2.5 rounded-full bg-black/50 text-white hover:text-[#ffcc00] hover:bg-black/80 transition-all active:scale-90"
+            className="absolute top-4 left-4 p-2 rounded-xl bg-black/60 text-white hover:text-yellow-400 active:scale-95 transition-all"
           >
-            <X size={16} />
+            <X size={15} />
           </button>
 
-          {/* Core metadata card overlap */}
-          <div className="relative z-10 pt-8 px-4 pb-4 flex gap-4">
-            <div className="w-24 sm:w-28 aspect-[3/4] rounded-xl overflow-hidden shadow-2xl border border-purple-500/10 shrink-0">
-              <img 
-                src={anime.image} 
-                alt={anime.name} 
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-              />
-            </div>
-
-            <div className="flex-1 flex flex-col justify-end pt-8">
-              <span className="text-[10px] text-yellow-400 font-extrabold flex items-center gap-1">
-                <Award size={10} />
-                <span>{anime.genre}</span>
-              </span>
-              <h2 className="text-sm sm:text-lg font-black text-white leading-tight mt-1 line-clamp-2">
-                {anime.name}
-              </h2>
-              
-              <div className="flex items-center gap-2 mt-2 font-sans">
-                <div className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-black/40 text-[#ffcc00] text-[10px] font-bold">
-                  <Star size={9} className="fill-[#ffcc00]" />
-                  <span>{anime.rating.toFixed(1)}</span>
-                </div>
-                <span className="text-[10px] text-gray-400">📅 {anime.year}</span>
-                <span className="text-[10px] text-gray-400">•</span>
-                <span className="text-[10px] text-gray-400">{anime.duration || "24 دقيقة"}</span>
-              </div>
-            </div>
+          {/* Quick titles */}
+          <div className="absolute bottom-4 right-5 text-right pl-5">
+            <span className="px-2.5 py-0.5 rounded-full bg-yellow-400 text-black text-[9px] font-black uppercase tracking-wider">
+              ⭐ {anime.rating} من ١٠
+            </span>
+            <h2 className="text-base md:text-xl font-black text-white mt-1.5 drop-shadow-md">
+              {anime.name}
+            </h2>
+            <p className="text-[10px] text-gray-300 line-clamp-1 font-medium mt-1">
+              تصنيف العمل: {anime.language} • {anime.type === 'movies' ? 'فيلم كرتون كامل' : 'مسلسل جاري'}
+            </p>
           </div>
         </div>
 
-        {/* Content body tabs and scrollable items */}
-        <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-5">
+        {/* 2. Scrollable details content */}
+        <div className="flex-1 overflow-y-auto p-5 text-right space-y-6">
           
-          {/* Detailed description */}
-          <div className="bg-[#07050f]/50 rounded-2xl p-3 border border-purple-950/10">
-            <h4 className="text-[10px] text-yellow-400 font-extrabold flex items-center gap-1 mb-1.5 uppercase tracking-wider font-sans">
-              <Info size={10} className="stroke-[2.5px]" />
-              <span>قصة الأنمي ومآثر الأبطال</span>
-            </h4>
-            <p className="text-[11px] text-gray-300 leading-relaxed font-normal">
+          {/* Description section */}
+          <div className="space-y-1.5 bg-[#07050f]/40 p-3.5 rounded-2xl border border-white/5">
+            <h3 className="text-[11px] text-yellow-500 font-extrabold font-sans">قصة ونبذة عن هذا العمل</h3>
+            <p className="text-xs text-gray-200 leading-relaxed font-semibold">
               {anime.description}
             </p>
           </div>
 
-          {/* Controls: Watchlist toggles & star ratings */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-b border-white/5 py-4">
-            
-            {/* Watchlist management */}
-            <div>
-              <h4 className="text-[10px] text-gray-400 font-extrabold mb-2.5 tracking-tight font-sans">
-                📂 إدارة قائمة الألعاب والمشاهدة
-              </h4>
-              <div className="flex gap-2 flex-wrap">
-                {/* Favorites button */}
-                <button
-                  id="watchlist-toggle-fav"
-                  onClick={() => currentWatchlistItem?.type === 'fav' ? removeFromWatchlist(anime.id) : addToWatchlist(anime.id, 'fav')}
-                  className={`flex-1 py-1.5 px-2.5 rounded-xl border text-[10px] font-bold transition-all flex items-center justify-center gap-1 active:scale-95 ${
-                    currentWatchlistItem?.type === 'fav'
-                      ? 'bg-rose-500/10 border-rose-500/40 text-rose-400'
-                      : 'border-white/5 bg-white/5 text-gray-300'
-                  }`}
-                >
-                  <Heart size={11} className={currentWatchlistItem?.type === 'fav' ? 'fill-rose-400' : ''} />
-                  <span>المفضلة</span>
-                </button>
+          {/* Watchlist management quick triggers */}
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              id="details-fav-btn"
+              onClick={() => toggleWatchlistType('fav')}
+              className={`py-2 px-3 rounded-xl border text-[10px] font-black flex items-center justify-center gap-1.5 active:scale-95 transition-all ${
+                isFav
+                  ? 'bg-red-500/10 border-red-500/30 text-red-400'
+                  : 'bg-white/5 border-white/5 text-gray-400 hover:text-white'
+              }`}
+            >
+              <Heart size={12} className={isFav ? 'fill-current' : ''} />
+              <span>{isFav ? 'في المفضلة' : 'أضف للمفضلة'}</span>
+            </button>
 
-                {/* Watch later button */}
-                <button
-                  id="watchlist-toggle-later"
-                  onClick={() => currentWatchlistItem?.type === 'later' ? removeFromWatchlist(anime.id) : addToWatchlist(anime.id, 'later')}
-                  className={`flex-1 py-1.5 px-2.5 rounded-xl border text-[10px] font-bold transition-all flex items-center justify-center gap-1 active:scale-95 ${
-                    currentWatchlistItem?.type === 'later'
-                      ? 'bg-yellow-500/10 border-yellow-500/40 text-yellow-400'
-                      : 'border-white/5 bg-white/5 text-gray-300'
-                  }`}
-                >
-                  <Clock size={11} />
-                  <span>لاحقاً</span>
-                </button>
+            <button
+              id="details-later-btn"
+              onClick={() => toggleWatchlistType('later')}
+              className={`py-2 px-3 rounded-xl border text-[10px] font-black flex items-center justify-center gap-1.5 active:scale-95 transition-all ${
+                isLater
+                  ? 'bg-yellow-500/10 border-[#ffcc00]/30 text-yellow-400'
+                  : 'bg-white/5 border-white/5 text-gray-400 hover:text-white'
+              }`}
+            >
+              <Bookmark size={12} className={isLater ? 'fill-current' : ''} />
+              <span>{isLater ? 'لاحقاً' : 'سأشاهده لاحقاً'}</span>
+            </button>
 
-                {/* Finished button */}
-                <button
-                  id="watchlist-toggle-watched"
-                  onClick={() => currentWatchlistItem?.type === 'watched' ? removeFromWatchlist(anime.id) : addToWatchlist(anime.id, 'watched')}
-                  className={`flex-1 py-1.5 px-2.5 rounded-xl border text-[10px] font-bold transition-all flex items-center justify-center gap-1 active:scale-95 ${
-                    currentWatchlistItem?.type === 'watched'
-                      ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
-                      : 'border-white/5 bg-white/5 text-gray-300'
-                  }`}
-                >
-                  <Check size={11} />
-                  <span>تمت مشاهدته</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Loyalty Rating slider */}
-            <div>
-              <h4 className="text-[10px] text-gray-400 font-extrabold mb-2.5 tracking-tight font-sans">
-                ⭐ تقييمك الخاص للألبوم
-              </h4>
-              <div className="flex items-center gap-1 bg-white/5 px-4 py-2 rounded-2xl justify-center border border-white/5">
-                {[1, 2, 3, 4, 5].map(starIdx => {
-                  const isHighlighted = hoverRating !== null ? starIdx <= hoverRating : starIdx <= currentPersonalRating;
-                  return (
-                    <button
-                      id={`star-btn-${starIdx}`}
-                      key={starIdx}
-                      onMouseEnter={() => setHoverRating(starIdx)}
-                      onMouseLeave={() => setHoverRating(null)}
-                      onClick={() => rateAnime(anime.id, starIdx)}
-                      className="text-2xl transition-all duration-100 hover:scale-125 focus:outline-none"
-                    >
-                      <span className={isHighlighted ? 'text-[#ffcc00]' : 'text-gray-600'}>★</span>
-                    </button>
-                  );
-                })}
-                {currentPersonalRating > 0 && (
-                  <span className="text-[10px] text-emerald-400 font-black mr-2 font-sans bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
-                    تم التقييم!
-                  </span>
-                )}
-              </div>
-            </div>
-
+            <button
+              id="details-watched-btn"
+              onClick={() => toggleWatchlistType('watched')}
+              className={`py-2 px-3 rounded-xl border text-[10px] font-black flex items-center justify-center gap-1.5 active:scale-95 transition-all ${
+                isWatched
+                  ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                  : 'bg-white/5 border-white/5 text-gray-400 hover:text-white'
+              }`}
+            >
+              <Check size={12} />
+              <span>{isWatched ? 'شاهدته بالكامل' : 'تم من قبلي'}</span>
+            </button>
           </div>
 
-          {/* Episode items listings */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs text-yellow-500 font-extrabold flex items-center gap-1 font-sans">
-                <ListChecks size={13} />
-                <span>جميع الحلقات ({anime.episodes_count})</span>
-              </h3>
-              <span className="text-[9px] text-gray-500 font-sans tracking-wide">اختر حلقة لبدء البث المباشر</span>
-            </div>
+          {/* Episodes Listing Grid */}
+          <div className="space-y-3">
+            <h3 className="text-xs text-white font-black flex items-center justify-between">
+              <span className="text-[10px] text-gray-500 font-sans font-bold">({episodes.length}) حلقة متوفرة</span>
+              <span>📦 الحلقات الكاملة المتوفرة</span>
+            </h3>
 
-            <div className="grid grid-cols-1 gap-2.5 max-h-56 overflow-y-auto pr-1">
-              {episodesList.map((ep) => (
-                <button
-                  id={`episode-row-${ep.id}`}
-                  key={ep.id}
-                  onClick={() => playEpisode(anime, ep)}
-                  className="flex items-center justify-between p-2.5 text-right rounded-2xl bg-white/5 border border-white/5 hover:border-[#ffcc00]/30 hover:bg-[#ffcc00]/5 transition-all text-xs active:scale-[0.99] group/row"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-black/40 text-[#ffcc00] text-[10px] font-extrabold font-sans">
-                      {ep.episode_number}
-                    </span>
-                    <span className="font-sans text-[11px] font-semibold text-gray-200 line-clamp-1 group-hover/row:text-[#ffcc00] transition-colors">
-                      {ep.title.split(" : ")[1] || ep.title}
-                    </span>
+            {loadingEpisodes ? (
+              <div className="py-8 text-center text-[10px] text-gray-500">جاري تجميع حلقات سينباي... 🏮</div>
+            ) : episodes.length ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {episodes.map((ep) => (
+                  <button
+                    id={`episode-play-btn-${ep.id}`}
+                    key={ep.id}
+                    onClick={() => playEpisode(ep)}
+                    className="p-3 rounded-xl bg-[#07050f]/80 border border-white/5 hover:border-yellow-400/40 hover:bg-[#07050f] text-right text-xs font-bold active:scale-95 duration-200 flex items-center justify-between gap-1"
+                  >
+                    <Play size={11} className="text-yellow-400 fill-yellow-400" />
+                    <div className="truncate">
+                      <span className="text-[9px] text-[#ffcc00] block">حلقة {ep.episode_number}</span>
+                      <span className="text-white text-[10px] truncate block">{ep.title}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 rounded-2xl bg-black/10 text-gray-500 text-[10px] leading-relaxed">
+                لا توجد حلقات مضافة لهذا الأنمي من قبل الأدمن حالياً 🏮
+                {currentUser?.role === 'admin' && (
+                  <span className="block text-[#ffcc00] font-bold mt-1.5">يمكنك إضافة حلقات لهذا العمل في مبوبة "لوحة التحكم" في الأسفل! ✨</span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Comments and Chat overlay */}
+          <div className="space-y-3 pt-2 border-t border-white/5">
+            <h3 className="text-xs text-white font-black flex items-center gap-1.5 justify-end">
+              <span className="text-[10px] text-gray-500 font-sans font-bold">({comments.length}) تعليق</span>
+              <MessageSquare size={13} className="text-purple-400" />
+              <span>تفاعل ونقاشات الأصدقاء حول العمل</span>
+            </h3>
+
+            {/* Comment Post Form */}
+            <form onSubmit={handleCommentSubmit} className="flex gap-2">
+              <input
+                id="comment-input-text"
+                type="text"
+                placeholder={currentUser ? "اكتب تعليقك ورأيك في هذا العمل..." : "سجّل الدخول لتستطيع وضع تعليقاتك..."}
+                disabled={!currentUser}
+                value={newCommentText}
+                onChange={(e) => setNewCommentText(e.target.value)}
+                className="flex-1 px-4 py-2.5 rounded-2xl bg-[#07050f] border border-white/5 text-white placeholder-gray-600 text-[11px] font-bold focus:outline-none focus:border-[#ffcc00] disabled:opacity-40"
+              />
+              <button
+                id="submit-comment-btn"
+                type="submit"
+                disabled={!currentUser || !newCommentText.trim()}
+                className="w-10 h-10 rounded-2xl bg-purple-600 text-white flex items-center justify-center active:scale-95 disabled:opacity-40 shrink-0"
+              >
+                <Send size={13} className="ml-0.5" />
+              </button>
+            </form>
+
+            {/* Comments Lists */}
+            <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
+              {loadingComments ? (
+                <div className="text-center py-4 text-[9px] text-gray-500">جاري قراءة لوحة التعليقات... 💬</div>
+              ) : comments.length ? (
+                comments.map((c) => (
+                  <div key={c.id} className="p-3 rounded-2xl bg-[#07050f]/30 border border-white/5 space-y-1">
+                    <div className="flex items-center justify-between text-[9px]">
+                      <span className="text-gray-600">{new Date(c.created_at).toLocaleDateString('ar-EG')}</span>
+                      <span className="text-yellow-400 font-black flex items-center gap-1">
+                        <span>{c.username}</span>
+                        <span className="w-4 h-4 rounded bg-purple-950 flex items-center justify-center text-[7px] text-white font-mono">ID</span>
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-200 font-medium leading-relaxed font-sans">{c.text}</p>
                   </div>
-
-                  <span className="flex items-center justify-center w-7 h-7 rounded-full bg-[#ffcc00]/10 text-[#ffcc00] group-hover/row:bg-[#ffcc00] group-hover/row:text-black transition-all shrink-0">
-                    <Play size={10} className="fill-current ml-0.5" />
-                  </span>
-                </button>
-              ))}
+                ))
+              ) : (
+                <div className="text-center py-4 text-[9px] text-gray-600">كن أول من يترك انطباعاً متميزاً حول هذا الأنمي الرهيب! 🌸</div>
+              )}
             </div>
           </div>
 
         </div>
-      </motion.div>
+
+      </div>
     </div>
   );
 };

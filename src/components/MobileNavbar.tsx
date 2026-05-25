@@ -4,7 +4,8 @@
  */
 
 import React from 'react';
-import { Tv, Heart, Sparkles, Gift, MessageSquare } from 'lucide-react';
+import { useSido } from '../context/SidoContext';
+import { Home, Heart, Bot, Gift, Lightbulb, Settings2 } from 'lucide-react';
 
 interface MobileNavbarProps {
   activeTab: string;
@@ -12,68 +13,103 @@ interface MobileNavbarProps {
 }
 
 export const MobileNavbar: React.FC<MobileNavbarProps> = ({ activeTab, onTabChange }) => {
-  const tabs = [
-    { id: 'home', label: 'الرئيسية', icon: Tv },
-    { id: 'watchlist', label: 'مكتبتي', icon: Heart },
-    { id: 'ai', label: 'مستشار الذكي', icon: Sparkles, highlight: true },
-    { id: 'prizes', label: 'النقاط', icon: Gift },
-    { id: 'suggestions', label: 'الاقتراحات', icon: MessageSquare },
-  ];
+  const { currentUser } = useSido();
+
+  const handleTabClick = (tabId: string) => {
+    onTabChange(tabId);
+  };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#120f22]/95 backdrop-blur-lg border-t border-purple-950/40 px-2 py-2 pb-3 shadow-2xl">
-      <div className="flex items-center justify-around max-w-lg mx-auto">
-        {tabs.map(tab => {
-          const IconComponent = tab.icon;
-          const isActive = activeTab === tab.id;
+    <nav className="fixed bottom-0 inset-x-0 bg-[#120f22]/95 border-t border-purple-950/20 backdrop-blur-md z-40 pb-safe-bottom shadow-2xl">
+      <div className="max-w-lg mx-auto flex items-center justify-around py-2.5 px-3">
+        
+        {/* 1. Home Feed */}
+        <button
+          id="nav-tab-home"
+          onClick={() => handleTabClick('home')}
+          className={`flex flex-col items-center gap-1 active:scale-95 transition-all py-1 px-3.5 rounded-2xl ${
+            activeTab === 'home'
+              ? 'text-yellow-400 bg-yellow-500/5'
+              : 'text-[#887aaa] hover:text-white'
+          }`}
+        >
+          <Home size={16} className={activeTab === 'home' ? 'stroke-[2.5px]' : 'stroke-[1.8px]'} />
+          <span className="text-[9px] font-bold font-sans">الرئيسية</span>
+        </button>
 
-          return (
-            <button
-              id={`nav-tab-${tab.id}`}
-              key={tab.id}
-              onClick={() => onTabChange(tab.id)}
-              className="relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all duration-300 tap-highlight-transparent active:scale-90"
-            >
-              {/* Highlight background glow for active AI bubble */}
-              {tab.highlight && (
-                <span className="absolute -top-1.5 w-8 h-8 rounded-full bg-yellow-500/20 blur-md animate-pulse z-0" />
-              )}
+        {/* 2. Library/Watchlist */}
+        <button
+          id="nav-tab-watchlist"
+          onClick={() => handleTabClick('watchlist')}
+          className={`flex flex-col items-center gap-1 active:scale-95 transition-all py-1 px-3.5 rounded-2xl ${
+            activeTab === 'watchlist'
+              ? 'text-yellow-400 bg-yellow-500/5'
+              : 'text-[#887aaa] hover:text-white'
+          }`}
+        >
+          <Heart size={16} className={activeTab === 'watchlist' ? 'stroke-[2.5px]' : 'stroke-[1.8px]'} />
+          <span className="text-[9px] font-bold font-sans">مكتبتي</span>
+        </button>
 
-              <div
-                className={`relative z-10 p-1 rounded-lg transition-transform duration-300 ${
-                  isActive
-                    ? tab.highlight
-                      ? 'text-[#ffcc00] scale-110'
-                      : 'text-[#ffcc00] scale-105'
-                    : 'text-gray-400'
-                }`}
-              >
-                <IconComponent
-                  size={isActive ? (tab.highlight ? 22 : 20) : 18}
-                  className={`transition-all ${
-                    isActive && !tab.highlight ? 'stroke-[2.5px]' : ''
-                  } ${isActive && tab.highlight ? 'animate-bounce' : ''}`}
-                />
-              </div>
+        {/* 3. AI Chat Advisor */}
+        <button
+          id="nav-tab-ai"
+          onClick={() => handleTabClick('ai')}
+          className={`flex flex-col items-center gap-1 active:scale-95 transition-all py-1 px-3.5 rounded-2xl relative ${
+            activeTab === 'ai'
+              ? 'text-yellow-400 bg-yellow-500/5'
+              : 'text-[#887aaa] hover:text-white'
+          }`}
+        >
+          <Bot size={16} className={activeTab === 'ai' ? 'stroke-[2.5px]' : 'stroke-[1.8px]'} />
+          <span className="text-[9px] font-bold font-sans">سينباي AI</span>
+          <span className="absolute top-1 right-2 w-1.5 h-1.5 rounded-full bg-red-500 animate-ping pointer-events-none" />
+        </button>
 
-              {/* Text label */}
-              <span
-                className={`relative z-10 text-[9px] mt-0.5 tracking-wide transition-all ${
-                  isActive 
-                    ? 'text-[#ffcc00] font-bold' 
-                    : 'text-gray-500 font-medium'
-                }`}
-              >
-                {tab.label}
-              </span>
+        {/* 4. Reward Points Prizes Wheel */}
+        <button
+          id="nav-tab-prizes"
+          onClick={() => handleTabClick('prizes')}
+          className={`flex flex-col items-center gap-1 active:scale-95 transition-all py-1 px-3.5 rounded-2xl ${
+            activeTab === 'prizes'
+              ? 'text-yellow-400 bg-yellow-500/5'
+              : 'text-[#887aaa] hover:text-white'
+          }`}
+        >
+          <Gift size={16} className={activeTab === 'prizes' ? 'stroke-[2.5px]' : 'stroke-[1.8px]'} />
+          <span className="text-[9px] font-bold font-sans font-sans">الهدايا</span>
+        </button>
 
-              {/* Glowing active line indicator */}
-              {isActive && (
-                <span className="absolute bottom-[-2px] w-5 h-[2px] bg-[#ffcc00] rounded-full shadow-lg shadow-[#ffcc00]/50" />
-              )}
-            </button>
-          );
-        })}
+        {/* 5. Suggestions Box board */}
+        <button
+          id="nav-tab-suggestions"
+          onClick={() => handleTabClick('suggestions')}
+          className={`flex flex-col items-center gap-1 active:scale-95 transition-all py-1 px-3.5 rounded-2xl ${
+            activeTab === 'suggestions'
+              ? 'text-yellow-400 bg-yellow-500/5'
+              : 'text-[#887aaa] hover:text-white'
+          }`}
+        >
+          <Lightbulb size={16} className={activeTab === 'suggestions' ? 'stroke-[2.5px]' : 'stroke-[1.8px]'} />
+          <span className="text-[9px] font-bold font-sans font-sans">أفكار</span>
+        </button>
+
+        {/* 6. Admin Panel (Conditional trigger) */}
+        {currentUser && currentUser.role === 'admin' && (
+          <button
+            id="nav-tab-admin"
+            onClick={() => handleTabClick('admin')}
+            className={`flex flex-col items-center gap-1 active:scale-95 transition-all py-1 px-3.5 rounded-2xl ${
+              activeTab === 'admin'
+                ? 'text-yellow-400 bg-yellow-500/5'
+                : 'text-red-400 font-extrabold hover:text-red-300'
+            }`}
+          >
+            <Settings2 size={16} className={activeTab === 'admin' ? 'stroke-[2.5px]' : 'stroke-[1.8px]'} />
+            <span className="text-[9px] font-black font-sans">لوحة التحكم</span>
+          </button>
+        )}
+
       </div>
     </nav>
   );

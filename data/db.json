@@ -1,0 +1,18 @@
+{
+  "users": [],
+  "animeList": [],
+  "episodes": [],
+  "watchlist": [],
+  "suggestions": [
+    {
+      "id": "1",
+      "username": "محب المنصة",
+      "category": "تطوير عام",
+      "text": "نتمنى توفير سيرفرات سريعة وجودات متعددة للبث المباشر للأصدقاء!",
+      "votes": 5,
+      "voted_by": [],
+      "created_at": "2026-05-23T21:35:00.000Z"
+    }
+  ],
+  "comments": []
+}

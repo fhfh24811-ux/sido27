@@ -5,8 +5,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useSido } from '../context/SidoContext';
-import { Sparkles, Send, Bot, User, Loader2, RefreshCw } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { MessageSquare, Send, Sparkles, Bot, CornerDownLeft } from 'lucide-react';
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -14,174 +13,137 @@ interface ChatMessage {
 }
 
 export const AiSenpai: React.FC = () => {
-  const { currentProfile } = useSido();
+  const { currentUser } = useSido();
 
-  // Chat conversation state
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    return [
-      {
-        role: 'model',
-        text: `أوهايو غوزايماس يا صديقي ${currentProfile.username}-تشان! 🌸🐉\n\nأنا **سينباي سيدو (Senpai Sido)**، مستشارك ومساعدك الأوتاكو الأسطوري الشاهد على كل تحف وعجائب الأنمي والدراما!\n\nقل لي... كيف هو مزاجك اليوم؟ أو ما هو تصنيف الأنمي الذي تحلم بمشاهدته الليلة؟ دعني أرسم لك دليلاً غنياً بالحماس! 🎌✨`
-      }
-    ];
-  });
+  // Initial greeting statement
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      role: 'model',
+      text: 'كونيتشيوا! أوهايو يا صديقي الأوتاكو! 🐉🌸\nأنا سينباي سيدو (Sido Senpai) مرشدك الذكي المدعوم بـ Gemini الذكاء الاصطناعي.\nأخبرني: ما هو مزاجك اليوم؟ غامض؟ حماسي؟ رومانسي؟ أم كلاسيكي؟ وسوف أرشدك لأروع الأنميات والمسلسلات التي تناسب ذوقك وتماثل رغبتك الرائعة فوراً!'
+    }
+  ]);
 
-  const [inputText, setInputText] = useState('');
+  const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Auto Scroll ref
-  const autoScrollRef = useRef<HTMLDivElement>(null);
-
+  // Auto scroll
   useEffect(() => {
-    autoScrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (scrollRef.current) {
+      scrollRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages, loading]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim() || loading) return;
+    if (!input.trim() || loading) return;
 
-    const userQuery = inputText.trim();
-    setInputText('');
-    
-    // Add User message
-    const updatedMessages = [...messages, { role: 'user' as const, text: userQuery }];
-    setMessages(updatedMessages);
+    const userText = input.trim();
+    setInput('');
     setLoading(true);
 
-    try {
-      // Map chat messages history for context continuity
-      const chatHistory = updatedMessages.slice(1, -1); // Skip first model greeting, exclude last user message
+    // Append to messages list
+    const updatedMessages: ChatMessage[] = [...messages, { role: 'user', text: userText }];
+    setMessages(updatedMessages);
 
+    try {
       const response = await fetch('/api/gemini/recommend', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: userQuery, chatHistory }),
+        body: JSON.stringify({
+          prompt: userText,
+          // sending latest 6 messages to keep context window light and highly responsive
+          chatHistory: updatedMessages.slice(-6)
+        })
       });
 
-      const data = await response.json();
-      
-      // Add Model reply
-      setMessages(prev => [...prev, { role: 'model', text: data.reply }]);
+      if (response.ok) {
+        const data = await response.json();
+        setMessages((prev) => [...prev, { role: 'model', text: data.reply || 'آسف يا صديقي، طاقة الأثير منخفضة ولا أستطيع الرد بدقة الآن.' }]);
+      } else {
+        setMessages((prev) => [...prev, { role: 'model', text: 'دايجوبو ديس كا؟ 😢 يبدو أن الخادم الرئيسي يواجه حملاً مرتفعاً حالياً.' }]);
+      }
     } catch (err) {
-      console.error("Failed to query AI advisor:", err);
-      setMessages(prev => [
-        ...prev, 
-        { 
-          role: 'model', 
-          text: "دايجوبو ديس كا؟ 😢 طاقة الأثير مجهدة مؤقتاً بسبب تداخل بوابات الرياتسو... يرجى معاودة المحاولة أو التحدث معي كالعادة بعد وهلة!" 
-        }
-      ]);
+      console.error('Gemini advisor error:', err);
+      setMessages((prev) => [...prev, { role: 'model', text: 'فشل الاتصال الراديوي مع سينباي. يرجى تكرار المحاولة!' }]);
     } finally {
       setLoading(false);
     }
   };
 
-  const clearChatHistory = () => {
-    setMessages([
-      {
-        role: 'model',
-        text: `أوهايو غوزايماس يا بطل! 🍥 دعنا نبدأ مغامرة أوتاكو جديدة تماماً. بماذا تود أن تهمس لي بخصوص ذوقك في الأنمي والمسلسلات اليوم؟ ⚔️`
-      }
-    ]);
-  };
-
   return (
-    <div className="flex flex-col h-[70vh] max-w-lg mx-auto bg-[#120f22]/30 rounded-3xl border border-white/5 overflow-hidden shadow-2xl relative">
+    <div className="max-w-2xl mx-auto p-4 pb-24 h-[calc(100vh-140px)] flex flex-col justify-between text-right">
       
-      {/* 1. Header with clear button */}
-      <div className="bg-purple-950/20 border-b border-white/5 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-400 to-[#ffcc00] flex items-center justify-center text-black font-black text-sm">
-            🐉
-          </div>
-          <div>
-            <h3 className="text-xs font-black text-white flex items-center gap-1">
-              <span>سينباي سيدو الذكي</span>
-              <Sparkles size={10} className="text-[#ffcc00] fill-[#ffcc00]" />
-            </h3>
-            <span className="text-[9px] text-gray-500 font-medium">مستشار الأوتاكو والدراما التفاعلية</span>
-          </div>
+      {/* Introduction floating header */}
+      <div className="bg-[#120f22]/70 p-4 rounded-2xl border border-yellow-500/10 shrink-0 mb-3 flex items-center justify-between gap-2.5">
+        <div className="text-right">
+          <h2 className="text-xs font-black text-white flex items-center gap-1.5 justify-end">
+            <span>سينباي سيدو الذكي SIDO AI</span>
+            <Sparkles size={11} className="text-yellow-400 fill-yellow-400" />
+          </h2>
+          <p className="text-[9px] text-gray-500 mt-0.5 leading-relaxed">مرشدك الآلي الذكي للدراما وتوصيات الأنميات المخصصة</p>
         </div>
-
-        <button
-          id="clear-chat-btn"
-          onClick={clearChatHistory}
-          className="p-1.5 rounded-lg hover:bg-white/5 text-gray-500 hover:text-red-400 active:scale-95 transition-colors"
-          title="مسح المحادثة وتجديد الطاقة"
-        >
-          <RefreshCw size={13} />
-        </button>
+        <Bot size={22} className="text-[#ffcc00] shrink-0" />
       </div>
 
-      {/* 2. Chat messages stage */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 pr-2">
-        {messages.map((msg, idx) => {
-          const isModel = msg.role === 'model';
-          return (
-            <motion.div
-              id={`chat-msg-${idx}`}
-              key={idx}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`flex gap-2 max-w-[85%] ${isModel ? 'self-start' : 'self-end flex-row-reverse ml-auto'}`}
-            >
-              {/* Profile indicator ball */}
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] shrink-0 ${isModel ? 'bg-[#ffcc00] text-black font-black' : 'bg-purple-600 text-white'}`}>
-                {isModel ? '🐉' : <User size={10} />}
-              </div>
-
-              {/* Message bubble balloon */}
-              <div className={`py-2.5 px-3.5 rounded-2xl text-[11px] leading-relaxed relative ${
-                isModel 
-                  ? 'bg-purple-950/10 border border-purple-950/20 text-gray-200 rounded-tr-none text-right font-medium' 
-                  : 'bg-gradient-to-r from-yellow-500 to-[#ffcc00] text-[#07050f] rounded-tl-none text-right font-bold shadow'
-              }`}>
-                {msg.text.split('\n').map((line, lIdx) => (
-                  <p key={lIdx} className={line.trim() === '' ? 'h-2' : 'mt-1 first:mt-0'}>
-                    {line}
-                  </p>
-                ))}
-              </div>
-            </motion.div>
-          );
-        })}
-
-        {/* AI Thinking/Querying Loader */}
-        {loading && (
-          <div className="flex gap-2 max-w-[85%] self-start animate-pulse">
-            <div className="w-6 h-6 rounded-full bg-[#ffcc00] text-black flex items-center justify-center font-black text-[10px]">
-              🐉
+      {/* Messages stream viewport */}
+      <div className="flex-1 bg-black/25 rounded-3xl border border-white/5 overflow-y-auto p-4 space-y-3.5 mb-3.5 select-text">
+        {messages.map((m, idx) => (
+          <div 
+            key={idx}
+            className={`flex items-start gap-2 max-w-[85%] ${m.role === 'user' ? 'mr-auto flex-row-reverse' : 'ml-auto'}`}
+          >
+            {/* Avatar thumbnail */}
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${m.role === 'user' ? 'bg-indigo-600/20 text-indigo-400' : 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20'}`}>
+              {m.role === 'user' ? <span className="text-[10px] font-black font-sans">أنا</span> : <span className="text-xs">🏮</span>}
             </div>
-            <div className="py-2 px-3 rounded-2xl rounded-tr-none bg-purple-950/10 border border-purple-950/20 text-[10px] text-gray-400 flex items-center gap-1.5 font-bold font-sans">
-              <Loader2 className="animate-spin text-yellow-500" size={10} />
-              <span>جاري صب تمائم الأنمي السحرية...</span>
+
+            {/* Bubble body text */}
+            <div className={`p-3.5 rounded-2xl text-[11px] font-semibold leading-relaxed font-sans ${
+              m.role === 'user' 
+                ? 'bg-gradient-to-tr from-purple-650 to-indigo-600 text-white rounded-tr-none' 
+                : 'bg-[#120f22] text-gray-100 rounded-tl-none border border-white/5'
+            }`}>
+              <div className="whitespace-pre-line text-right leading-relaxed font-semibold">
+                {m.text}
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {loading && (
+          <div className="flex items-start gap-2 ml-auto max-w-[80%]">
+            <div className="w-8 h-8 rounded-xl bg-yellow-500/10 text-yellow-500 flex items-center justify-center border border-yellow-500/20">
+              <span className="text-xs">🏮</span>
+            </div>
+            <div className="p-3.5 rounded-3xl bg-[#120f22] text-gray-400 text-[10px] flex items-center gap-1.5 border border-white/5">
+              <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-ping" />
+              <span>جاري تحليل قاعدة ذوقك الأسطوري... 🍥</span>
             </div>
           </div>
         )}
 
-        {/* Anchor point */}
-        <div ref={autoScrollRef} />
+        <div ref={scrollRef} />
       </div>
 
-      {/* 3. Text Message input bar form */}
-      <form onSubmit={handleSendMessage} className="p-3 bg-purple-950/5 border-t border-white/5 flex gap-2">
+      {/* Input console area */}
+      <form onSubmit={handleSendMessage} className="flex gap-2 shrink-0">
         <input
-          id="chat-input-text"
+          id="chat-user-input"
           type="text"
-          placeholder="أدخل مزاجك.. مثال: أنمي أكشن ياباني حماسي وقوي!"
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
+          placeholder="مثال: اقترح لي أنمي قتالي يحمل غموض وأساطير سحرية..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
           disabled={loading}
-          className="flex-1 px-4 py-2.5 rounded-2xl bg-[#07050f] border border-white/5 text-white placeholder-gray-600 text-[11px] font-bold focus:outline-none focus:border-[#ffcc00] disabled:opacity-50"
+          className="flex-1 px-4 py-3 rounded-2xl bg-[#120f22] border border-white/5 text-white placeholder-gray-600 text-[11px] font-bold focus:outline-none focus:border-[#ffcc00] disabled:opacity-55"
         />
-
         <button
-          id="chat-send-btn"
+          id="chat-send-submit"
           type="submit"
-          disabled={!inputText.trim() || loading}
-          className="w-10 h-10 rounded-2xl bg-gradient-to-r from-[#ffcc00] to-[#ff9900] text-black flex items-center justify-center active:scale-95 transition-transform disabled:opacity-40 shrink-0"
+          disabled={loading || !input.trim()}
+          className="w-12 h-12 rounded-2xl bg-gradient-to-r from-yellow-500 to-[#ffcc00] text-black hover:opacity-90 active:scale-95 flex items-center justify-center shrink-0 disabled:opacity-40"
         >
-          <Send size={14} className="fill-black ml-0.5" />
+          <Send size={15} className="ml-0.5 fill-current" />
         </button>
       </form>
 
